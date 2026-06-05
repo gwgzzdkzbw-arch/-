@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>星骰 · 占星骰子</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
+    background: linear-gradient(145deg, #0a0a1a 0%, #0d0d2b 40%, #0f0a1a 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 24px;
+    color: #e8e0d4;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 20% 30%, rgba(232,224,212,0.3), transparent),
+      radial-gradient(1px 1px at 40% 70%, rgba(232,224,212,0.2), transparent),
+      radial-gradient(1.5px 1.5px at 60% 20%, rgba(232,224,212,0.4), transparent),
+      radial-gradient(1px 1px at 80% 50%, rgba(232,224,212,0.2), transparent),
+      radial-gradient(1px 1px at 10% 80%, rgba(232,224,212,0.3), transparent),
+      radial-gradient(1.5px 1.5px at 70% 90%, rgba(232,224,212,0.25), transparent),
+      radial-gradient(1px 1px at 30% 50%, rgba(232,224,212,0.15), transparent),
+      radial-gradient(1px 1px at 90% 10%, rgba(232,224,212,0.2), transparent),
+      radial-gradient(1px 1px at 50% 40%, rgba(232,224,212,0.1), transparent);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 680px;
+    background: rgba(18, 16, 30, 0.75);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(212, 165, 116, 0.15);
+    border-radius: 36px;
+    padding: 48px 40px 40px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+
+  .header { text-align: center; margin-bottom: 32px; }
+  .header h1 {
+    font-size: 28px; font-weight: 700; letter-spacing: 8px;
+    background: linear-gradient(135deg, #d4a574 0%, #e8d5b0 50%, #d4a574 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .header .subtitle { font-size: 13px; color: rgba(232,224,212,0.4); letter-spacing: 4px; margin-top: 6px; }
+
+  /* 问题区 */
+  .question-area { margin-bottom: 28px; }
+  .question-area .qlabel {
+    font-size: 12px; color: rgba(212,165,116,0.5); letter-spacing: 2px;
+    margin-bottom: 8px; text-align: center;
+  }
+  .question-area textarea {
+    width: 100%; display: block;
+    background: rgba(212,165,116,0.04); border: 1px solid rgba(212,165,116,0.15);
+    border-radius: 14px; padding: 14px 16px;
+    font-size: 15px; font-family: inherit;
+    color: #e8d5b0; line-height: 1.5;
+    resize: vertical; min-height: 56px; max-height: 120px;
+    outline: none; transition: border-color 0.3s;
+  }
+  .question-area textarea:focus {
+    border-color: rgba(212,165,116,0.4);
+    box-shadow: 0 0 12px rgba(212,165,116,0.04);
+  }
+  .question-area textarea::placeholder {
+    color: rgba(232,224,212,0.15);
+  }
+
+  /* 骰子区 */
+  .dice-row { display: flex; justify-content: center; gap: 20px; margin-bottom: 28px; }
+  .die-wrap { flex: 1; max-width: 180px; text-align: center; }
+  .die-label { font-size: 12px; color: rgba(212, 165, 116, 0.6); letter-spacing: 3px; margin-bottom: 10px; font-weight: 500; }
+  .die {
+    position: relative;
+    background: linear-gradient(160deg, rgba(212,165,116,0.08) 0%, rgba(212,165,116,0.02) 100%);
+    border: 1px solid rgba(212, 165, 116, 0.2); border-radius: 18px;
+    padding: 28px 12px; min-height: 90px;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.3s, box-shadow 0.3s; overflow: hidden;
+  }
+  .die.rolling { border-color: rgba(212, 165, 116, 0.5); box-shadow: 0 0 24px rgba(212,165,116,0.08); }
+  .die.settled { border-color: rgba(212, 165, 116, 0.35); }
+  .die-value { font-size: 22px; font-weight: 600; color: #e8d5b0; line-height: 1.3; user-select: none; }
+  .die-value.rolling-text { animation: shimmer 0.08s linear; }
+  @keyframes shimmer { 0% { opacity: 0.3; transform: scale(0.95); } 100% { opacity: 1; transform: scale(1); } }
+  .die-value.settled-text { animation: settlePop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+  @keyframes settlePop {
+    0% { opacity: 0.5; transform: scale(0.85); }
+    60% { transform: scale(1.08); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+
+  /* 按钮区 */
+  .btn-area { text-align: center; margin-bottom: 24px; display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 14px 38px; font-size: 16px; font-weight: 600;
+    border: none; border-radius: 50px; cursor: pointer; letter-spacing: 2px;
+    transition: all 0.25s;
+  }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+
+  .btn-throw {
+    color: #0a0a1a;
+    background: linear-gradient(135deg, #d4a574, #c8925e);
+    box-shadow: 0 4px 20px rgba(212,165,116,0.25);
+  }
+  .btn-throw:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(212,165,116,0.35); }
+  .btn-throw:active:not(:disabled) { transform: scale(0.96); }
+
+  .btn-interpret {
+    color: #d4a574;
+    background: transparent;
+    border: 1px solid rgba(212,165,116,0.3);
+  }
+  .btn-interpret:hover:not(:disabled) { border-color: rgba(212,165,116,0.6); background: rgba(212,165,116,0.04); }
+  .btn-interpret:active:not(:disabled) { transform: scale(0.96); }
+
+  .btn-copy {
+    color: rgba(232,224,212,0.3); font-size: 12px; padding: 6px 14px;
+    background: transparent; border: 1px solid rgba(232,224,212,0.08);
+    letter-spacing: 1px;
+  }
+  .btn-copy:hover:not(:disabled) { border-color: rgba(232,224,212,0.2); color: rgba(232,224,212,0.5); }
+
+  /* 结果区 */
+  .result-area {
+    background: rgba(212, 165, 116, 0.04);
+    border: 1px solid rgba(212, 165, 116, 0.1); border-radius: 20px;
+    padding: 20px 24px; margin-bottom: 20px;
+    min-height: 56px; transition: all 0.4s;
+  }
+
+  .empty-result { text-align: center; color: rgba(232,224,212,0.2); font-size: 14px; letter-spacing: 1px; padding: 6px 0; }
+
+  .result-content { display: none; }
+  .result-content .r-step {
+    font-size: 11px; color: rgba(212,165,116,0.25); letter-spacing: 2px;
+    margin-bottom: 6px; text-align: center;
+  }
+  .result-content .r-question {
+    font-size: 16px; font-weight: 500; color: #e8d5b0;
+    text-align: center; margin-bottom: 14px;
+    padding: 6px 12px; background: rgba(212,165,116,0.04);
+    border-radius: 10px;
+  }
+  .result-content .r-combo {
+    font-size: 20px; font-weight: 600; color: #e8d5b0;
+    text-align: center; letter-spacing: 1px; margin-bottom: 12px;
+  }
+  .result-content .r-combo .dot { color: rgba(212,165,116,0.3); margin: 0 6px; }
+
+  .result-content .r-reading {
+    font-size: 14px; line-height: 1.8; color: rgba(232,224,212,0.65);
+    text-align: center;
+  }
+  .r-reading .hl-p { color: #d4a574; }
+  .r-reading .hl-s { color: #b8c4d8; }
+  .r-reading .hl-h { color: #9ab8a8; }
+
+  /* 解读正文 */
+  .r-answer { margin: 12px 0 14px; }
+
+  /* 直接回答（加粗醒目） */
+  .r-direct-answer {
+    margin: 10px 0 14px; padding: 12px 16px;
+    background: rgba(212,165,116,0.06);
+    border: 1px solid rgba(212,165,116,0.15);
+    border-radius: 12px;
+    font-size: 16px; font-weight: 600; line-height: 1.6;
+    color: #e8d5b0; text-align: center;
+  }
+
+  .r-answer-p {
+    font-size: 14px; line-height: 1.9; color: rgba(232,224,212,0.7);
+    margin-bottom: 10px; padding: 0 2px; text-align: left;
+  }
+  .r-answer-p .hl-p { color: #d4a574; font-weight: 600; }
+  .r-answer-p .hl-s { color: #b8c4d8; font-weight: 600; }
+  .r-answer-p .hl-h { color: #9ab8a8; font-weight: 600; }
+  .r-answer-p.r-summary {
+    margin-top: 6px; padding: 10px 14px;
+    background: rgba(212,165,116,0.04);
+    border-left: 2px solid rgba(212,165,116,0.2);
+    border-radius: 0 8px 8px 0;
+    font-size: 13px; color: rgba(232,224,212,0.5);
+  }
+
+  /* 速查折叠 */
+  .r-extra-toggle {
+    font-size: 12px; color: rgba(212,165,116,0.25); cursor: pointer;
+    user-select: none; transition: color 0.2s; text-align: center;
+    padding: 4px 0;
+  }
+  .r-extra-toggle:hover { color: rgba(212,165,116,0.45); }
+  .r-table { margin: 14px 0 12px; }
+  .r-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 0; border-bottom: 1px solid rgba(212,165,116,0.06);
+  }
+  .r-row:last-child { border-bottom: none; }
+  .r-cell { font-size: 14px; line-height: 1.5; }
+  .r-cell.r-label {
+    min-width: 40px; font-size: 11px; letter-spacing: 2px;
+    color: rgba(212,165,116,0.35); font-weight: 500;
+  }
+  .r-cell .hl-p { color: #d4a574; font-weight: 600; }
+  .r-cell .hl-s { color: #b8c4d8; font-weight: 600; }
+  .r-cell .hl-h { color: #9ab8a8; font-weight: 600; }
+  .r-cell.r-detail {
+    color: rgba(232,224,212,0.35); font-size: 12px;
+    margin-left: auto; text-align: right; max-width: 200px;
+  }
+  .r-deep-prompt {
+    margin-top: 14px; padding: 10px 14px;
+    background: rgba(212,165,116,0.04);
+    border: 1px dashed rgba(212,165,116,0.12);
+    border-radius: 12px; text-align: center;
+    font-size: 12px; color: rgba(232,224,212,0.3);
+    line-height: 1.6;
+  }
+  .r-deep-prompt strong { color: #d4a574; font-weight: 600; }
+
+  /* 历史 */
+  .history-area { margin-top: 4px; }
+  .history-toggle {
+    font-size: 12px; color: rgba(232,224,212,0.25); cursor: pointer;
+    display: inline-flex; align-items: center; gap: 4px; user-select: none; transition: color 0.2s;
+  }
+  .history-toggle:hover { color: rgba(232,224,212,0.45); }
+  .history-list { margin-top: 10px; max-height: 0; overflow: hidden; transition: max-height 0.4s ease; }
+  .history-list.open { max-height: 360px; overflow-y: auto; }
+  .history-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 4px; border-bottom: 1px solid rgba(212,165,116,0.05);
+    font-size: 13px; color: rgba(232,224,212,0.4);
+  }
+  .history-item:last-child { border-bottom: none; }
+  .history-item .h-time { font-size: 11px; color: rgba(232,224,212,0.2); min-width: 52px; }
+  .history-item .h-combo { color: rgba(232,224,212,0.6); font-weight: 500; flex: 1; margin: 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .history-item .h-view {
+    font-size: 11px; color: rgba(212,165,116,0.3); cursor: pointer;
+    padding: 2px 6px; border-radius: 4px; transition: color 0.2s;
+  }
+  .history-item .h-view:hover { color: rgba(212,165,116,0.6); }
+  .history-list::-webkit-scrollbar { width: 3px; }
+  .history-list::-webkit-scrollbar-track { background: transparent; }
+  .history-list::-webkit-scrollbar-thumb { background: rgba(212,165,116,0.15); border-radius: 10px; }
+
+  @media (max-width: 520px) {
+    .container { padding: 32px 20px 28px; border-radius: 28px; }
+    .dice-row { gap: 12px; }
+    .die { padding: 20px 8px; min-height: 72px; }
+    .die-value { font-size: 18px; }
+    .header h1 { font-size: 24px; }
+    .btn { padding: 12px 28px; font-size: 15px; }
+    .result-content .r-combo { font-size: 17px; }
+    .result-content .r-question { font-size: 14px; }
+    .question-area textarea { font-size: 14px; }
+  }
+
+  @media (max-width: 400px) {
+    .dice-row { gap: 8px; }
+    .die { padding: 16px 6px; min-height: 64px; }
+    .die-value { font-size: 15px; }
+    .die-label { font-size: 10px; letter-spacing: 1px; }
+    .container { padding: 24px 14px 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>✦ 星 骰 ✦</h1>
+    <div class="subtitle">— ASTROLOGICAL DICE —</div>
+  </div>
+
+  <!-- 第一步：输入问题 -->
+  <div class="question-area">
+    <div class="qlabel">你 的 问 题</div>
+    <textarea id="question-input" placeholder="写下你想问的问题……" maxlength="200"></textarea>
+  </div>
+
+  <!-- 骰子 -->
+  <div class="dice-row">
+    <div class="die-wrap">
+      <div class="die-label">行 星</div>
+      <div class="die" id="die-planet"><div class="die-value" id="val-planet">✦</div></div>
+    </div>
+    <div class="die-wrap">
+      <div class="die-label">星 座</div>
+      <div class="die" id="die-sign"><div class="die-value" id="val-sign">✦</div></div>
+    </div>
+    <div class="die-wrap">
+      <div class="die-label">宫 位</div>
+      <div class="die" id="die-house"><div class="die-value" id="val-house">✦</div></div>
+    </div>
+  </div>
+
+  <!-- 第二步 + 第三步：按钮 -->
+  <div class="btn-area">
+    <button class="btn btn-throw" id="btn-throw"><span>·</span> 投 掷 <span>·</span></button>
+    <button class="btn btn-interpret" id="btn-interpret" disabled>解 读</button>
+    <button class="btn btn-copy" id="btn-copy" disabled>复制结果</button>
+  </div>
+
+  <!-- 结果展示 -->
+  <div class="result-area" id="result-area">
+    <div class="empty-result" id="empty-msg">写问题 → 投掷 → 解读</div>
+    <div class="result-content" id="result-content">
+      <div class="r-step"></div>
+      <div class="r-question" id="r-question"></div>
+      <div class="r-combo" id="r-combo"></div>
+      <div class="r-reading" id="r-reading"></div>
+    </div>
+  </div>
+
+  <!-- 历史 -->
+  <div class="history-area">
+    <div class="history-toggle" id="history-toggle">▸ 历史记录</div>
+    <div class="history-list" id="history-list"></div>
+  </div>
+
+</div>
+
+<script>
+// ===== 数据 =====
+const PLANETS = [
+  { name: '太阳', keywords: '自我、目标、生命力、彰显、权威', energy: '核心自我与生命力的展现' },
+  { name: '月亮', keywords: '情绪、习惯、潜意识、滋养、安全感', energy: '内在情绪与习惯性反应' },
+  { name: '水星', keywords: '思维、沟通、信息、学习、交流', energy: '理性思考与信息交换' },
+  { name: '金星', keywords: '爱、美、关系、金钱、愉悦、和谐', energy: '吸引力与价值感的表达' },
+  { name: '火星', keywords: '行动、冲动、竞争、欲望、勇气', energy: '主动出击与欲望驱动' },
+  { name: '木星', keywords: '扩张、幸运、成长、乐观、机会', energy: '幸运扩张与成长契机' },
+  { name: '土星', keywords: '限制、责任、纪律、压力、现实', energy: '结构性约束与长期责任' },
+  { name: '天王星', keywords: '突然、变革、创新、自由、科技', energy: '突破常规的意外变革' },
+  { name: '海王星', keywords: '幻想、逃避、灵性、模糊、灵感', energy: '消融边界的灵性感知' },
+  { name: '冥王星', keywords: '转化、死亡与重生、深度、控制', energy: '深度转化的颠覆性力量' },
+  { name: '北交点', keywords: '灵魂方向、新领域、命运召唤', energy: '灵魂进化的方向指引' },
+  { name: '南交点', keywords: '过去业力、习惯模式、放下', energy: '需要放下的旧有模式' }
+];
+
+const SIGNS = [
+  { name: '白羊座', element: '火', mode: '本位', style: '冲动直接、勇敢独立、主动开创' },
+  { name: '金牛座', element: '土', mode: '固定', style: '稳固持久、务实享受、坚定固执' },
+  { name: '双子座', element: '风', mode: '变动', style: '灵活好奇、善于沟通、多元变化' },
+  { name: '巨蟹座', element: '水', mode: '本位', style: '保护敏感、情绪归属、关怀滋养' },
+  { name: '狮子座', element: '火', mode: '固定', style: '自信骄傲、创造表演、热情慷慨' },
+  { name: '处女座', element: '土', mode: '变动', style: '细致分析、完美主义、务实服务' },
+  { name: '天秤座', element: '风', mode: '本位', style: '平衡合作、社交和谐、追求公正' },
+  { name: '天蝎座', element: '水', mode: '固定', style: '深度秘密、控制转化、极致强烈' },
+  { name: '射手座', element: '火', mode: '变动', style: '探索自由、乐观扩张、追求真理' },
+  { name: '摩羯座', element: '土', mode: '本位', style: '责任野心、务实结构、长期规划' },
+  { name: '水瓶座', element: '风', mode: '固定', style: '创新独立、反叛独特、群体关怀' },
+  { name: '双鱼座', element: '水', mode: '变动', style: '同情灵感、幻灭超越、流动融合' }
+];
+
+const HOUSES = [
+  { name: '第1宫', area: '自己、外表、自我形象、身体', desc: '一切「我」的开端，自我呈现方式' },
+  { name: '第2宫', area: '金钱、资源、个人价值、自尊', desc: '物质基础与自我价值感' },
+  { name: '第3宫', area: '沟通、学习、兄弟姐妹、出行', desc: '日常信息交流与基础学习' },
+  { name: '第4宫', area: '家庭、根源、内在情感、房产', desc: '内心根基与家族归属' },
+  { name: '第5宫', area: '娱乐、恋爱、孩子、创造力', desc: '自我表达与纯粹快乐' },
+  { name: '第6宫', area: '工作、健康、日常事务、服务', desc: '日常秩序与责任管理' },
+  { name: '第7宫', area: '婚姻、合作、公开对手、关系', desc: '一对一关系与契约合作' },
+  { name: '第8宫', area: '共同资源、性、危机、深层心理', desc: '深度融合与转化议题' },
+  { name: '第9宫', area: '高等教育、旅行、哲学、信仰', desc: '探索意义与远方视野' },
+  { name: '第10宫', area: '事业、名声、社会地位、目标', desc: '社会成就与人生使命' },
+  { name: '第11宫', area: '朋友、团体、希望、愿景', desc: '社交圈与集体理想' },
+  { name: '第12宫', area: '潜意识、孤寂、灵修、隐藏', desc: '内在秘境与灵性归处' }
+];
+
+// 星座搭配对应关系（用于解读时的元素/模式分析）
+const ELEM_MAP = { '火': '行动与热情', '土': '务实与物质', '风': '思维与沟通', '水': '情绪与直觉' };
+const MODE_MAP = { '本位': '主动开创', '固定': '持续稳定', '变动': '灵活调整' };
+
+// ===== 状态 =====
+let rolling = false;
+let hasResult = false;
+let currentResult = null; // { planet, sign, house }
+let currentQuestion = '';
+let history = [];
+try { const s = localStorage.getItem('star-dice-history'); if (s) history = JSON.parse(s); } catch(e) {}
+
+// ===== DOM =====
+const $ = id => document.getElementById(id);
+const valPlanet = $('val-planet'), valSign = $('val-sign'), valHouse = $('val-house');
+const diePlanet = $('die-planet'), dieSign = $('die-sign'), dieHouse = $('die-house');
+const btnThrow = $('btn-throw'), btnInterpret = $('btn-interpret'), btnCopy = $('btn-copy');
+const questionInput = $('question-input');
+const resultContent = $('result-content'), emptyMsg = $('empty-msg');
+const rQuestion = $('r-question'), rCombo = $('r-combo'), rReading = $('r-reading');
+const historyToggle = $('history-toggle'), historyList = $('history-list');
+
+// ===== 工具函数 =====
+function randomItem(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function formatTime() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// ===== 核心：三步流程 =====
+
+// 1. 投掷
+function throwDice() {
+  if (rolling) return;
+  rolling = true;
+  hasResult = false;
+  currentResult = null;
+
+  btnThrow.disabled = true;
+  btnInterpret.disabled = true;
+  btnCopy.disabled = true;
+  btnThrow.innerHTML = '<span>·</span> 掷 出 <span>·</span>';
+
+  // 记录当前问题
+  currentQuestion = questionInput.value.trim();
+
+  // 隐藏结果区
+  resultContent.style.display = 'none';
+  emptyMsg.style.display = 'none';
+
+  [diePlanet, dieSign, dieHouse].forEach(d => {
+    d.classList.remove('settled');
+    d.classList.add('rolling');
+  });
+
+  const els = [
+    { el: valPlanet, arr: PLANETS },
+    { el: valSign, arr: SIGNS },
+    { el: valHouse, arr: HOUSES }
+  ];
+
+  const result = {
+    planet: randomItem(PLANETS),
+    sign: randomItem(SIGNS),
+    house: randomItem(HOUSES)
+  };
+
+  const phases = [
+    { duration: 400, interval: 50 },
+    { duration: 400, interval: 100 },
+    { duration: 400, interval: 200 },
+    { duration: 350, interval: 350 }
+  ];
+
+  let phaseIndex = 0;
+  function runPhase() {
+    if (phaseIndex >= phases.length) { finishRoll(result); return; }
+    const phase = phases[phaseIndex];
+    const cycles = Math.floor(phase.duration / phase.interval);
+    let count = 0;
+    const timer = setInterval(() => {
+      els.forEach(({ el, arr }) => {
+        el.textContent = randomItem(arr).name;
+        el.className = 'die-value rolling-text';
+      });
+      count++;
+      if (count >= cycles) { clearInterval(timer); phaseIndex++; runPhase(); }
+    }, phase.interval);
+  }
+
+  function finishRoll(result) {
+    valPlanet.textContent = result.planet.name;
+    valSign.textContent = result.sign.name;
+    valHouse.textContent = result.house.name;
+    [valPlanet, valSign, valHouse].forEach(el => el.className = 'die-value settled-text');
+    [diePlanet, dieSign, dieHouse].forEach(d => {
+      d.classList.remove('rolling');
+      d.classList.add('settled');
+    });
+
+    currentResult = result;
+    hasResult = true;
+
+    // 只在结果区显示组合（不自动解读）
+    const combo = `${result.planet.name} · ${result.sign.name} · ${result.house.name}`;
+    rCombo.textContent = combo;
+    rQuestion.textContent = currentQuestion || '（未填写问题）';
+    rReading.innerHTML = '';
+    resultContent.style.display = 'block';
+    resultContent.style.opacity = 0;
+    let op = 0;
+    const fade = setInterval(() => { op += 0.08; resultContent.style.opacity = op; if (op >= 1) clearInterval(fade); }, 30);
+
+    // 启用解读按钮
+    btnInterpret.disabled = false;
+    btnCopy.disabled = false;
+
+    rolling = false;
+    btnThrow.disabled = false;
+    btnThrow.innerHTML = '<span>·</span> 再掷一次 <span>·</span>';
+  }
+
+  runPhase();
+}
+
+// ===== 解读引擎 =====
+
+const PLANET_READINGS = {
+  '太阳': '太阳的能量在说：这件事关乎你真实的自我展现。不要隐藏真实的想法，你内心的「主角感」会引导你走向对的方向。',
+  '月亮': '月亮告诉你：答案不在逻辑里，在你的感受里。关注你的直觉和情绪反应，它们比理性更早知道结果。照顾好情绪，其他会自然跟上。',
+  '水星': '水星提示你：信息是解开这个问题的钥匙。去沟通、去问、去收集更多信息，答案就在你主动发出的那通电话或那条消息里。',
+  '金星': '金星的能量围绕吸引力与价值感。你需要的不是「得到什么」，而是「你觉得自己值不值得」。先确认自己的价值，外部自然会匹配。',
+  '火星': '火星说：该行动了。这件事不需要再分析、再等待——勇气比完美的方案更重要。哪怕方向只有七分对，先迈出一步。',
+  '木星': '木星是幸运的扩张。机会在放大，但小心过度乐观。好运是站在你这边，但别指望它替你走完所有路。',
+  '土星': '土星带来了延迟和责任。结果不会来得很快，但这段时间不是浪费——你在结构性地为长期打基础。耐心是对你最大的考验。',
+  '天王星': '天王星说：准备好意外。这件事会有超出预期的转折，也许是突然的机会或变故。不要死守计划，保持灵活才能接住惊喜。',
+  '海王星': '海王星的光芒是模糊的。你也许在期待一个美好的结果，但要分清幻想和直觉。如果这件事让你感到模糊不清，那就先别动，等雾散。',
+  '冥王星': '冥王星是深度的转化。无论你希望的结果是什么，这件事最终会带你走到一个比你想象更根本的地方——它会让你变一个版本。',
+  '北交点': '北交点是命运的方向。宇宙在借这件事推你往该走的方向走。它可能不舒服，但它是你灵魂进化的课题，也是你必须面对的那一课。',
+  '南交点': '南交点是过去的业力。你对这件事的反应里，有很大一部分来自旧习惯和舒适区。问自己：我是在做熟悉的选择，还是真的选对了？'
+};
+
+// 直接回答：按问题类型 + 行星 给出结论句
+const VERDICTS = {
+  mood: {
+    '太阳': '今天的心情会偏向积极、自信，内心有种想发光的冲动。',
+    '月亮': '今天情绪比较敏感起伏，容易被周围氛围影响，适合照顾好自己。',
+    '水星': '今天思绪活跃，心情取决于信息是否顺畅——找人说说话会好很多。',
+    '金星': '今天心情整体不错，适合做点让自己感到愉悦和享受的事。',
+    '火星': '今天精力充沛但容易急躁，小心别被小事点燃，先深呼吸。',
+    '木星': '今天心态乐观开放，心情大概率是好的，适合主动找点乐子。',
+    '土星': '今天可能有点沉重感，但这种压力是踏实而非沮丧，适合安静做正事。',
+    '天王星': '今天心情容易波动，可能被突发事件影响，保持灵活别太较劲。',
+    '海王星': '今天容易胡思乱想，情绪有点模糊，别让自己沉进去。',
+    '冥王星': '今天内心有股不安的力量，适合深入反思而非表面应付。',
+    '北交点': '今天有一种被推着走的感觉，心情复杂但方向是值得信任的。',
+    '南交点': '今天容易陷入习惯性的情绪里，有意识地跳出来看看会更好。'
+  },
+  prediction: {
+    '太阳': '结果会往有利于你展现自我的方向发展，你有主动权。',
+    '月亮': '结果有一定的变数，取决于情绪和周遭反应，先稳住自己。',
+    '水星': '结果会通过沟通和信息逐渐明朗，多问问会有收获。',
+    '金星': '结果偏向好的方向，过程会比较和谐顺畅。',
+    '火星': '结果来得快，但需要你主动去推动，等是等不来的。',
+    '木星': '结果整体向好，有机会的成分，但别坐等好运。',
+    '土星': '结果会有延迟，但基础打得扎实，值得你耐心等待。',
+    '天王星': '结果可能出人意料，不要预设太多，会有变数。',
+    '海王星': '结果目前还很模糊，现在不是看清楚的时候，再等等。',
+    '冥王星': '结果会带来深层转变，比你表面预期的更根本。',
+    '北交点': '结果是命运的一部分，顺应它走比对抗它轻松。',
+    '南交点': '结果可能会让你回到熟悉的老路上，问问自己要不要换个方向。'
+  },
+  decision: {
+    '太阳': '选那个让你更能做自己的选项，答案在你心里。',
+    '月亮': '听从你的感受，不要只看利弊——你的情绪比逻辑更诚实。',
+    '水星': '先收集更多信息，现在的信息还不够做决定。',
+    '金星': '选那个让你感到愉悦和值得的，而不是最安全的。',
+    '火星': '果断行动，现在不是犹豫的时候。',
+    '木星': '选那个让你感到成长和扩张的选项，机会窗口是开的。',
+    '土星': '选那个更负责任、更长远的，慢但稳。',
+    '天王星': '选那个让你感到自由的选项，打破常规也许是对的。',
+    '海王星': '现在不是做决定的好时机，等雾散了再说。',
+    '冥王星': '这个选择比你想象的影响更深，认真对待，不要草率。',
+    '北交点': '选那个让你有点不安但直觉告诉你该去的方向。',
+    '南交点': '问自己：这个选择是不是又在走老路？如果是，换个走法。'
+  },
+  relationship: {
+    '太阳': '在关系中做真实的自己，你的坦诚会被看见。',
+    '月亮': '关系中情绪比道理重要，先照顾好彼此的感受。',
+    '水星': '多沟通，很多问题其实是信息差造成的误会。',
+    '金星': '关系氛围是和谐的，适合推进或表达心意。',
+    '火星': '关系中可能有摩擦，但也是拉近距离的机会。',
+    '木星': '关系有发展和扩张的空间，氛围不错。',
+    '土星': '关系需要时间和责任来检验，别急，慢慢来。',
+    '天王星': '关系可能出现变动或意外转折，保持开放心态。',
+    '海王星': '你可能有美化对方的倾向，分清想象和现实。',
+    '冥王星': '这段关系会触及你内心深处的东西，不只是表面。',
+    '北交点': '这段关系是来教你一些东西的，注意它带给你的成长。',
+    '南交点': '你在这段关系中可能重复了旧模式，试着换个反应方式。'
+  },
+  // 通用后备
+  general: {
+    '太阳': '答案是肯定的，关键在于你如何自信地走向它。',
+    '月亮': '答案在情绪里，不在逻辑里。先问问自己的感受。',
+    '水星': '答案藏在你还没打出的那通电话和没发出的消息里。',
+    '金星': '答案是正面的，但你需要先确认自己真的想要。',
+    '火星': '答案是行动，而不是思考。迈出第一步就清楚了。',
+    '木星': '答案是乐观的，有机会成分，但需要你主动抓住。',
+    '土星': '答案是"会，但要等"。延迟不是否定。',
+    '天王星': '答案是"可能会出乎你的意料"。别太执着于预设。',
+    '海王星': '答案是模糊的，现在还不是看清楚的时候。',
+    '冥王星': '答案是"会改变你"。无论结果如何，你都会不一样。',
+    '北交点': '答案是"你应该往这个方向走"。宇宙在推你。',
+    '南交点': '答案是"先问自己，是不是又在走老路"。'
+  }
+};
+
+const SIGN_READINGS = {
+  '白羊座': '以主动直接的方式展开。别犹豫，先做了再说。勇气是你此刻最重要的武器。',
+  '金牛座': '以稳固持久的方式展开。慢慢来，不急于求成。坚持和耐心比速度和冲劲更有效。',
+  '双子座': '以灵活沟通的方式展开。多问、多聊、多了解不同视角。答案藏在更多信息里。',
+  '巨蟹座': '以保护滋养的方式展开。先照顾好自己的情绪，再去管外部的事。安全感是出发点。',
+  '狮子座': '以自信创造的方式展开。这件事需要你的光芒，不要怕被看见。你的热情会感染人。',
+  '处女座': '以细致分析的方式展开。细节决定成败。把这当作一个需要逐步优化的过程，而不是一次定输赢。',
+  '天秤座': '以平衡和谐的方式展开。在自我需求和他人需求之间找到中点。这件事不是非黑即白。',
+  '天蝎座': '以深度转化的方式展开。不要停留在表面，深入探究背后的动机和真相。极致才有答案。',
+  '射手座': '以探索自由的方式展开。放宽视野，往远了看。答案可能不在当前框框里，而在「走出去」之后。',
+  '摩羯座': '以责任规划的方式展开。这是需要长期投入的事，短期看不到回报很正常。稳扎稳打才是正解。',
+  '水瓶座': '以创新独立的方式展开。不要走别人走过的路。你自己的想法和独特视角就是最好的路径。',
+  '双鱼座': '以灵感共情的方式展开。用心感受，而不是用脑子分析。答案在氛围里，在直觉里。'
+};
+
+const HOUSE_READINGS = {
+  '第1宫': '第1宫关于「你自己」——你的性格、形象和外在呈现。这件事本质上是关于你如何定义和展示自己。',
+  '第2宫': '第2宫关于「金钱与价值」——你的资源、收入和自我价值感。这背后是物质安全感和配得感的议题。',
+  '第3宫': '第3宫关于「沟通与信息」——学习、交流、短途出行。答案可能通过主动交流或获取新信息出现。',
+  '第4宫': '第4宫关于「家与根源」——家庭、内心归属、童年模式。这件事牵动你的根本安全感，和你的「根」有关。',
+  '第5宫': '第5宫关于「创造与快乐」——恋爱、娱乐、兴趣爱好。试着用轻松的态度去看待，不要把它搞得太沉重。',
+  '第6宫': '第6宫关于「工作与健康」——日常事务、责任、身体状态。需要你有条理地处理，落实到每天的行动上。',
+  '第7宫': '第7宫关于「关系与合作」——伴侣、搭档、一对一关系。这结果取决于你和他人的互动与平衡。',
+  '第8宫': '第8宫关于「深度与共同资源」——危机、转变、深层信任。不要回避难的部分，突破就在那里。',
+  '第9宫': '第9宫关于「远见与意义」——高等教育、长途旅行、人生观。试着站高一层看这个问题，答案在更大的图景里。',
+  '第10宫': '第10宫关于「事业与社会角色」——你的职业、名声和人生目标。这事关你希望成为什么样的人。',
+  '第11宫': '第11宫关于「社交与愿景」——朋友、圈子、集体目标。答案可能来自你的人际网络或群体的力量。',
+  '第12宫': '第12宫关于「潜意识与灵性」——孤独、梦境、隐密。这件事有你看不到的层面在运作，相信时间会揭示答案。'
+};
+
+// 问题类型检测
+const Q_PATTERNS = [
+  { keywords: ['心情', '开心', '难过', '情绪', '感觉', '状态', '怎么样'], type: 'mood', label: '心情与状态' },
+  { keywords: ['买', '钱', '工资', '花', '贵', '便宜', '省', '存'], type: 'material', label: '物质与金钱' },
+  { keywords: ['喜欢', '爱', '感情', '男朋友', '女朋友', '对象', '在一起', '追', '分手', '结婚', '离婚', '暧昧'], type: 'relationship', label: '感情与关系' },
+  { keywords: ['工作', '面试', '升职', '辞职', '换工作', '领导', '同事', 'offer', '入职', '跳槽', '项目'], type: 'career', label: '工作与事业' },
+  { keywords: ['考', '学习', '考试', '成绩', '毕业', '论文', '考研', 'MBA', '读书', '课程'], type: 'study', label: '学业与成长' },
+  { keywords: ['该不该', '要不要', '能不能', '行不行', '怎么选', '选择', '决定', '选哪个', '怎么办'], type: 'decision', label: '决策与选择' },
+  { keywords: ['健康', '身体', '瘦', '胖', '减肥', '游泳', '运动', '生病', '失眠', '累'], type: 'health', label: '健康与身体' },
+  { keywords: ['会吗', '会不会', '能吗', '什么时候', '将来', '未来', '多久', '结果', '走向', '发展'], type: 'prediction', label: '预测与走向' },
+  { keywords: ['爸爸', '妈妈', '爸', '妈', '家人', '家', '父母', '家庭', '亲戚'], type: 'family', label: '家庭与家人' },
+  { keywords: ['朋友', '闺蜜', '社交', '同事', '人脉', '约'], type: 'social', label: '人际与社交' }
+];
+
+function detectQuestionType(q) {
+  if (!q) return null;
+  for (const p of Q_PATTERNS) {
+    for (const kw of p.keywords) {
+      if (q.includes(kw)) return p;
+    }
+  }
+  return null;
+}
+
+// 生成直接结论句
+function generateDirectAnswer(qType, planetName) {
+  if (!qType) {
+    // 没有匹配到类型，用通用
+    return VERDICTS.general[planetName] || '';
+  }
+  const verdicts = VERDICTS[qType.type];
+  if (verdicts && verdicts[planetName]) {
+    return verdicts[planetName];
+  }
+  return VERDICTS.general[planetName] || '';
+}
+
+// 2. 生成解读（基于问题+骰子的三段式回答）
+function generateInterpretation() {
+  if (!hasResult || !currentResult) return;
+  const { planet, sign, house } = currentResult;
+  const question = currentQuestion || '';
+
+  const pReading = PLANET_READINGS[planet.name] || '';
+  const sReading = SIGN_READINGS[sign.name] || '';
+  const hReading = HOUSE_READINGS[house.name] || '';
+
+  const qType = detectQuestionType(question);
+
+  // 构建封面：问题 + 组合
+  let html = `<div class="r-question">${question || '（未提出问题）'}</div>`;
+  html += `<div class="r-combo">${planet.name} · ${sign.name} · ${house.name}</div>`;
+
+  // ---- 直接回答：先给结论 ----
+  const directAnswer = generateDirectAnswer(qType, planet.name);
+  if (directAnswer) {
+    html += `<div class="r-direct-answer">${directAnswer}</div>`;
+  }
+
+  // ---- 详细解读 ----
+  html += `<div class="r-answer">`;
+
+  // 开篇：如果检测到问题类型，加一句定向
+  if (qType && question) {
+    html += `<p class="r-answer-p">关于「${qType.label}」的问题，骰子给出的指引是——</p>`;
+  }
+
+  // 段落1：行星能量
+  html += `<p class="r-answer-p"><span class="hl-p">${planet.name}</span> ${pReading}</p>`;
+
+  // 段落2：星座方式
+  html += `<p class="r-answer-p"><span class="hl-s">${sign.name}</span> ${sReading}</p>`;
+
+  // 段落3：宫位领域
+  html += `<p class="r-answer-p"><span class="hl-h">${house.name}</span> ${hReading}</p>`;
+
+  // 段落4：结合问题的总结
+  if (question) {
+    html += `<p class="r-answer-p r-summary">总结来说，关于「${question.length > 20 ? question.slice(0, 20) + '…' : question}」，${planet.name}的能量推动你关注「${planet.keywords.split('、')[0]}」，${sign.name}建议你用「${sign.style.split('、')[0]}」的节奏，而在${house.name}的领域（${house.area.split('、')[0]}）中将显现出结果。</p>`;
+  }
+
+  html += `</div>`;
+
+  // ---- 速查附录 ----
+  html += `<div class="r-extra-toggle" onclick="toggleExtra()">▸ 查看三要素速查</div>`;
+  html += `<div class="r-extra" id="r-extra" style="display:none;">`;
+  const rows = [
+    { label: '行星', name: planet.name, detail: planet.keywords, cls: 'hl-p' },
+    { label: '星座', name: sign.name, detail: `${sign.element}象 · ${sign.mode} · ${sign.style}`, cls: 'hl-s' },
+    { label: '宫位', name: house.name, detail: house.area, cls: 'hl-h' }
+  ];
+  html += `<div class="r-table">`;
+  rows.forEach(r => {
+    html += `<div class="r-row">
+      <div class="r-cell r-label">${r.label}</div>
+      <div class="r-cell"><span class="${r.cls}">${r.name}</span></div>
+      <div class="r-cell r-detail">${r.detail}</div>
+    </div>`;
+  });
+  html += `</div></div>`;
+
+  // 深度解读入口
+  html += `<div class="r-deep-prompt">
+    如果需要更贴合你个人经历的深度解读，<strong>复制结果发给小鱼</strong>，她会结合你的具体情况继续分析
+  </div>`;
+
+  rReading.innerHTML = html;
+  rQuestion.textContent = question;
+  rCombo.textContent = `${planet.name} · ${sign.name} · ${house.name}`;
+
+  // 历史记录
+  const record = {
+    time: formatTime(),
+    combo: `${planet.name} · ${sign.name} · ${house.name}`,
+    question: currentQuestion,
+    planet: planet.name, sign: sign.name, house: house.name
+  };
+  history.unshift(record);
+  if (history.length > 20) history.pop();
+  try { localStorage.setItem('star-dice-history', JSON.stringify(history)); } catch(e) {}
+  renderHistory();
+}
+
+// 速查折叠
+function toggleExtra() {
+  const el = document.getElementById('r-extra');
+  const toggler = el.previousElementSibling;
+  if (el.style.display === 'none') {
+    el.style.display = 'block';
+    toggler.textContent = '▾ 收起速查';
+  } else {
+    el.style.display = 'none';
+    toggler.textContent = '▸ 查看三要素速查';
+  }
+}
+
+// 3. 复制结果（格式：问题 + 组合，方便粘贴给小鱼）
+function copyResult() {
+  if (!hasResult || !currentResult) return;
+  const { planet, sign, house } = currentResult;
+  const q = currentQuestion || '';
+  const combo = `${planet.name}·${sign.name}·${house.name}`;
+  const text = q ? `${q}\n${combo}` : combo;
+
+  // 现代 clipboard API
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      const orig = btnCopy.textContent;
+      btnCopy.textContent = '✓ 已复制';
+      setTimeout(() => btnCopy.textContent = orig, 1200);
+    }).catch(() => fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed'; ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); btnCopy.textContent = '✓ 已复制'; setTimeout(() => btnCopy.textContent = '复制结果', 1200); } catch(e) {}
+  document.body.removeChild(ta);
+}
+
+// ===== 历史记录 =====
+function renderHistory() {
+  historyList.innerHTML = '';
+  if (history.length === 0) {
+    historyList.innerHTML = '<div style="color:rgba(232,224,212,0.15);font-size:12px;text-align:center;padding:12px 0;">暂无记录</div>';
+    return;
+  }
+  history.forEach((item, idx) => {
+    const div = document.createElement('div');
+    div.className = 'history-item';
+    div.innerHTML = `
+      <span class="h-time">${item.time}</span>
+      <span class="h-combo">${item.question ? item.question.slice(0, 18) + (item.question.length > 18 ? '…' : '') : '—'} ${item.combo}</span>
+      <span class="h-view" data-idx="${idx}">查看</span>
+    `;
+    div.querySelector('.h-view').addEventListener('click', () => {
+      // 回填骰面
+      const p = PLANETS.find(x => x.name === item.planet);
+      const s = SIGNS.find(x => x.name === item.sign);
+      const h = HOUSES.find(x => x.name === item.house);
+      if (p && s && h) {
+        currentResult = { planet: p, sign: s, house: h };
+        hasResult = true;
+        currentQuestion = item.question || '';
+        valPlanet.textContent = p.name; valSign.textContent = s.name; valHouse.textContent = h.name;
+        [valPlanet, valSign, valHouse].forEach(el => el.className = 'die-value settled-text');
+        [diePlanet, dieSign, dieHouse].forEach(d => { d.classList.remove('rolling'); d.classList.add('settled'); });
+        rCombo.textContent = item.combo;
+        rReading.innerHTML = '';
+        rQuestion.textContent = currentQuestion || '（未填写问题）';
+        resultContent.style.display = 'block'; resultContent.style.opacity = 1;
+        emptyMsg.style.display = 'none';
+        btnInterpret.disabled = false;
+        btnCopy.disabled = false;
+      }
+    });
+    historyList.appendChild(div);
+  });
+}
+
+// ===== 事件绑定 =====
+btnThrow.addEventListener('click', throwDice);
+btnInterpret.addEventListener('click', generateInterpretation);
+btnCopy.addEventListener('click', copyResult);
+
+// 空格投掷（输入框里不触发）
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.code === 'Space') { e.preventDefault(); throwDice(); }
+});
+
+// 历史折叠
+let historyOpen = false;
+historyToggle.addEventListener('click', () => {
+  historyOpen = !historyOpen;
+  historyList.classList.toggle('open', historyOpen);
+  historyToggle.textContent = historyOpen ? '▾ 历史记录' : '▸ 历史记录';
+  if (historyOpen) renderHistory();
+});
+
+// 初始化
+renderHistory();
+</script>
+</body>
+</html>
